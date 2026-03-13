@@ -6,8 +6,7 @@ st.set_page_config(page_title="MyPlaud - Timoom Edition", page_icon="🎙️")
 st.title("🎙️ MyPlaud: Dal Timoom al Verbale")
 st.markdown("Carica il file registrato per ottenere trascrizione e riassunto istantaneo.")
 
-# Gestione Chiave API (la trovi su console.groq.com)
-# Per ora la inserisci a mano, poi ti spiego come nasconderla
+# Gestione Chiave API
 api_key = st.sidebar.text_input("Inserisci Groq API Key", type="password")
 
 if not api_key:
@@ -15,7 +14,7 @@ if not api_key:
 else:
     client = Groq(api_key=api_key)
 
-    # Caricamento del file dal telefono (via OTG o memoria interna)
+    # Caricamento del file
     uploaded_file = st.file_uploader("Seleziona il file MP3 del tuo Timoom", type=['mp3', 'wav', 'm4a'])
 
     if uploaded_file:
@@ -23,21 +22,21 @@ else:
         
         if st.button("Genera Analisi"):
             try:
-                # 1. TRASCRIZIONE VELOCE (Whisper-large-v3)
-                with st.spinner("Trascrizione lampo in corso..."):
+                # 1. TRASCRIZIONE VELOCE
+                with st.spinner("Trascrizione in corso..."):
                     file_content = uploaded_file.read()
                     transcription = client.audio.transcriptions.create(
                         file=(uploaded_file.name, file_content),
                         model="whisper-large-v3",
                         response_format="verbose_json",
-                        language="it" # Forza l'italiano
+                        language="it"
                     )
                     full_text = transcription.text
                 
-                # 2. RIASSUNTO INTELLIGENTE (Llama 3.1 70B)
+                # 2. RIASSUNTO (Modello aggiornato per evitare l'errore 404)
                 with st.spinner("Analisi dei punti chiave..."):
                     completion = client.chat.completions.create(
-                        model="llama-3.1-70b-versatile",
+                        model="llama-3.3-70b-versatile", # <--- Modello corretto e aggiornato
                         messages=[
                             {"role": "system", "content": "Sei un assistente che redige verbali professionali. Trasforma la trascrizione in un documento strutturato con: 1. Riassunto breve, 2. Punti chiave discussi, 3. Cose da fare (Action Items). Rispondi in Italiano."},
                             {"role": "user", "content": f"Ecco il testo della registrazione: {full_text}"}
