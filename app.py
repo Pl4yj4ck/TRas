@@ -2,9 +2,9 @@ import streamlit as st
 from groq import Groq
 
 # Configurazione grafica
-st.set_page_config(page_title="MyPlaud Web", page_icon="🎙️", layout="centered")
-st.title("🎙️ MyPlaud: Trascrizione & Chat")
-st.markdown("Collega il tuo Timoom via OTG e carica il file per iniziare.")
+st.set_page_config(page_title="MyTranscriber Web", page_icon="🎙️", layout="centered")
+st.title("🎙️ MyTranscribe: Trascrizione & Chat")
+st.markdown("Carica il file per iniziare.")
 
 # Inizializzazione della memoria della chat se non esiste
 if "full_text" not in st.session_state:
