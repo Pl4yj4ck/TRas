@@ -2,61 +2,82 @@ import streamlit as st
 from groq import Groq
 
 # Configurazione grafica
-st.set_page_config(page_title="MyPlaud - Timoom Edition", page_icon="🎙️")
-st.title("🎙️ MyPlaud: Dal Timoom al Verbale")
-st.markdown("Carica il file registrato per ottenere trascrizione e riassunto istantaneo.")
+st.set_page_config(page_title="MyPlaud Web", page_icon="🎙️", layout="centered")
+st.title("🎙️ MyPlaud: Trascrizione & Chat")
+st.markdown("Collega il tuo Timoom via OTG e carica il file per iniziare.")
 
-# Gestione Chiave API
+# Inizializzazione della memoria della chat se non esiste
+if "full_text" not in st.session_state:
+    st.session_state.full_text = ""
+if "summary" not in st.session_state:
+    st.session_state.summary = ""
+
+# Barra laterale per la chiave
 api_key = st.sidebar.text_input("Inserisci Groq API Key", type="password")
 
 if not api_key:
-    st.info("⚠️ Inserisci la tua API Key di Groq nella barra laterale per iniziare.")
+    st.info("⚠️ Inserisci la tua API Key di Groq per attivare l'AI.")
 else:
     client = Groq(api_key=api_key)
 
-    # Caricamento del file
-    uploaded_file = st.file_uploader("Seleziona il file MP3 del tuo Timoom", type=['mp3', 'wav', 'm4a'])
+    # Caricamento file (accetta quasi tutto)
+    uploaded_file = st.file_uploader("Seleziona audio dal Timoom", type=['mp3', 'wav', 'm4a', 'flac', 'ogg'])
 
     if uploaded_file:
         st.audio(uploaded_file)
         
-        if st.button("Genera Analisi"):
+        # Bottone per la prima analisi
+        if st.button("🚀 Elabora Registrazione"):
             try:
-                # 1. TRASCRIZIONE VELOCE
                 with st.spinner("Trascrizione in corso..."):
-                    file_content = uploaded_file.read()
+                    file_bytes = uploaded_file.read()
                     transcription = client.audio.transcriptions.create(
-                        file=(uploaded_file.name, file_content),
+                        file=(uploaded_file.name, file_bytes),
                         model="whisper-large-v3",
-                        response_format="verbose_json",
                         language="it"
                     )
-                    full_text = transcription.text
+                    st.session_state.full_text = transcription.text
                 
-                # 2. RIASSUNTO (Modello aggiornato per evitare l'errore 404)
-                with st.spinner("Analisi dei punti chiave..."):
+                with st.spinner("Creazione verbale..."):
                     completion = client.chat.completions.create(
-                        model="llama-3.3-70b-versatile", # <--- Modello corretto e aggiornato
+                        model="llama-3.3-70b-versatile",
                         messages=[
-                            {"role": "system", "content": "Sei un assistente che redige verbali professionali. Trasforma la trascrizione in un documento strutturato con: 1. Riassunto breve, 2. Punti chiave discussi, 3. Cose da fare (Action Items). Rispondi in Italiano."},
-                            {"role": "user", "content": f"Ecco il testo della registrazione: {full_text}"}
-                        ],
-                        temperature=0.5
+                            {"role": "system", "content": "Sei un assistente esperto. Crea un verbale con: Riassunto, Punti chiave e Action items."},
+                            {"role": "user", "content": f"Testo: {st.session_state.full_text}"}
+                        ]
                     )
-                    summary = completion.choices[0].message.content
-
-                # Visualizzazione risultati
-                st.success("✅ Elaborazione completata!")
-                
-                tab1, tab2 = st.tabs(["📋 Verbale Riassuntivo", "📝 Trascrizione Completa"])
-                
-                with tab1:
-                    st.markdown(summary)
-                    st.download_button("Scarica Verbale", summary, file_name="verbale_riunione.md")
-                
-                with tab2:
-                    st.write(full_text)
-                    st.download_button("Scarica Trascrizione", full_text, file_name="trascrizione.txt")
-
+                    st.session_state.summary = completion.choices[0].message.content
+                st.success("Analisi completata!")
             except Exception as e:
-                st.error(f"Errore tecnico: {e}")
+                st.error(f"Errore: {e}. Se il file è troppo grande, prova a caricarne uno più breve.")
+
+    # Se abbiamo un testo, mostriamo i risultati e la CHAT
+    if st.session_state.full_text:
+        tab1, tab2 = st.tabs(["📋 Verbale", "📝 Testo Completo"])
+        
+        with tab1:
+            st.markdown(st.session_state.summary)
+        with tab2:
+            st.write(st.session_state.full_text)
+
+        # FUNZIONALITÀ CHAT (Chiedi alla trascrizione)
+        st.divider()
+        st.subheader("💬 Chiedi all'AI sulla registrazione")
+        user_query = st.text_input("Fai una domanda specifica (es: 'Quali compiti sono stati assegnati?')")
+        
+        if user_query:
+            with st.spinner("L'AI sta cercando nel testo..."):
+                chat_res = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {"role": "system", "content": f"Rispondi basandoti esclusivamente su questo testo: {st.session_state.full_text}"},
+                        {"role": "user", "content": user_query}
+                    ]
+                )
+                st.info(chat_res.choices[0].message.content)
+
+# Bottone per resettare tutto
+if st.sidebar.button("Cancella tutto"):
+    st.session_state.full_text = ""
+    st.session_state.summary = ""
+    st.rerun()
